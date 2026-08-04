@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ficha do Ateliê</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="loginScreen">
+      <div class="login-card">
+        <h1>Ficha Confecção</h1>
+        <div class="sub">Faça login para continuar</div>
+        <form id="loginForm">
+          <label for="loginEmail">E-mail</label>
+          <input
+            id="loginEmail"
+            type="email"
+            required
+            autocomplete="username"
+          />
+          <label for="loginPassword">Senha</label>
+          <input
+            id="loginPassword"
+            type="password"
+            required
+            autocomplete="current-password"
+          />
+          <button type="submit" class="loginbtn">Entrar</button>
+          <div id="loginError"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="app" id="appMain" style="display: none">
+      <header class="top">
+        <div>
+          <h1>Ficha Confecção</h1>
+          <div class="sub">Gestão de produção e pedidos</div>
+        </div>
+        <div class="header-right">
+          <span id="syncStatus" class="syncbadge">verificando…</span>
+          <button
+            id="logoutBtn"
+            class="syncbadge logoutbtn"
+            style="display: none"
+          >
+            Sair
+          </button>
+        </div>
+      </header>
+
+      <div class="weeknav">
+        <div class="week-controls">
+          <button id="prevWeek" class="navbtn" title="Semana anterior">
+            ‹
+          </button>
+          <div class="range" id="weekRange">carregando…</div>
+          <button id="nextWeek" class="navbtn" title="Próxima semana">›</button>
+          <button id="thisWeek" class="linkbtn">hoje</button>
+        </div>
+        <div class="print-menu-wrap">
+          <button class="primary" id="printMenuBtn">Imprimir ▾</button>
+          <div class="print-menu" id="printMenu">
+            <button type="button" data-action="relatorio">
+              Relatório da semana
+            </button>
+            <button type="button" data-action="totais">
+              Totais gerais por costureiro
+            </button>
+            <div class="print-menu-row">
+              <button type="button" data-action="cupom">
+                Cupom (maquininha)
+              </button>
+              <select id="paperWidth" title="Largura do papel">
+                <option value="32">58mm</option>
+                <option value="48" selected>80mm</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="layout">
+        <div class="ticket">
+          <h2>Registrar movimento</h2>
+          <div class="seg">
+            <button
+              type="button"
+              class="seg-btn saida active"
+              data-tipo="saida"
+            >
+              Saída
+            </button>
+            <button type="button" class="seg-btn retorno" data-tipo="retorno">
+              Entrada
+            </button>
+          </div>
+
+          <label for="nome">Costureiro(a)</label>
+          <input
+            id="nome"
+            list="nomesList"
+            placeholder="Nome"
+            autocomplete="off"
+          />
+          <datalist id="nomesList"></datalist>
+
+          <label for="pedido">Pedido</label>
+          <input id="pedido" placeholder="Ex: vestido floral, calça jeans" />
+
+          <div class="field-row">
+            <div>
+              <label for="tamanho">Tamanho</label>
+              <input id="tamanho" placeholder="Ex: P, M, G, 40" />
+            </div>
+            <div>
+              <label for="cor">Cor</label>
+              <input id="cor" placeholder="Ex: azul" />
+            </div>
+          </div>
+
+          <label for="qtd">Quantidade</label>
+          <input id="qtd" type="number" min="1" step="1" placeholder="0" />
+
+          <div id="valorField">
+            <label for="valorUnit">Valor (R$)</label>
+            <input
+              id="valorUnit"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0,00"
+            />
+          </div>
+
+          <label for="data">Data</label>
+          <input id="data" type="date" />
+
+          <button class="addbtn" id="addBtn">Adicionar</button>
+          <div class="err" id="errMsg"></div>
+        </div>
+
+        <div class="board">
+          <div class="board-head"><h2>Costureiros</h2></div>
+          <div class="person-list" id="personList"></div>
+          <div id="personDetail"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="printReport"></div>
+    <div id="printReceipt"><pre id="receiptText"></pre></div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
