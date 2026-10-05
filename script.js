@@ -463,6 +463,14 @@ function renderPersonDetail(){
   });
   const pend = levou-trouxe;
 
+  const prevRef = new Date(state.monthRef.getFullYear(), state.monthRef.getMonth()-1, 1);
+  const prevLabel = monthLabel(prevRef);
+  const prevMovs = state.movimentos.filter(m=>{
+    if(m.nome!==name) return false;
+    const d = parseISO(m.data);
+    return d.getFullYear()===prevRef.getFullYear() && d.getMonth()===prevRef.getMonth();
+  });
+
   let receitas=0, despesas=0;
   const porDesc = {};
   if(fin){
@@ -540,7 +548,8 @@ function renderPersonDetail(){
     </table></div>`}
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px;">
     <button type="button" class="section-toggle" id="toggleHistBtn">Ver histórico detalhado ▾</button>
-      <div style="display:flex;gap:8px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${prevMovs.length ? `<button type="button" class="printbtn" style="margin-right:0;" id="mergePrevBtn">⇢ Juntar ${escapeHtml(prevLabel.split(' ')[0])} aqui</button>` : ''}
         <button type="button" class="printbtn clearbtn" style="margin-right:0;" id="clearPersonBtn">🗑 Limpar tudo</button>
         <button class="printbtn" id="printPersonBtn">🖨 Imprimir ficha de ${escapeHtml(name)}</button>
       </div>
@@ -571,6 +580,26 @@ function renderPersonDetail(){
     state.aba = novo;
     render();
   });
+
+  const mergeBtn = document.getElementById('mergePrevBtn');
+  if(mergeBtn){
+    mergeBtn.addEventListener('click', ()=>{
+      confirmModal({
+        title: 'Juntar mês anterior?',
+        message: `Os <b>${prevMovs.length}</b> movimentos de <b>${escapeHtml(name)}</b> em <b>${escapeHtml(prevLabel)}</b> serão movidos para <b>${escapeHtml(monthLabel(state.monthRef))}</b>.`,
+        confirmText: 'Juntar',
+        onConfirm: async ()=>{
+          const ids = new Set(prevMovs.map(m=>m.id));
+          const novaData = toISODate(new Date(state.monthRef.getFullYear(), state.monthRef.getMonth(), 1));
+          state.movimentos.forEach(m=>{
+            if(ids.has(m.id)){ m.dataOriginal = m.data; m.data = novaData; }
+          });
+          await saveData();
+          render();
+        }
+      });
+    });
+  }
 
   document.getElementById('clearPersonBtn').addEventListener('click', ()=>{
     if(movs.length===0) return;
