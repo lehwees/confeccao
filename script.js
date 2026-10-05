@@ -421,7 +421,7 @@ function renderTabs(){
 
 function renderPersonList(){
   renderTabs();
-  const names = [...new Set(state.movimentos.map(m=>m.nome))].sort().filter(n=>grupoDe(n)===state.aba);
+  const names = [...new Set(monthMovs().map(m=>m.nome))].sort().filter(n=>grupoDe(n)===state.aba);
   if(state.selectedCostureiro && !names.includes(state.selectedCostureiro)) state.selectedCostureiro = null;
   const wrap = document.getElementById('personList');
   if(names.length===0){
