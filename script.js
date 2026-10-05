@@ -2,7 +2,9 @@ const state = {
   movimentos: [],
   tipoAtual: 'saida',
   weekRef: new Date(),
-  selectedCostureiro: null
+  monthRef: new Date(),
+  selectedCostureiro: null,
+  aba: 'costureiro'
 };
 
 const firebaseConfig = {
@@ -127,6 +129,7 @@ function formatMoney(v){
   return 'R$ ' + (v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function movValorDisplay(m){
+  if(m.grupo==='financas') return formatMoney((m.valorUnit||0)*m.qtd);
   return m.tipo==='saida' ? '–' : formatMoney((m.valorUnit||0)*m.qtd);
 }
 function formatSaldo(pend){
@@ -143,6 +146,16 @@ function getWeekRange(ref){
   return {start,end};
 }
 
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+function monthLabel(ref){ return `${MESES[ref.getMonth()]} ${ref.getFullYear()}`; }
+function monthMovs(){
+  const y = state.monthRef.getFullYear(), m = state.monthRef.getMonth();
+  return state.movimentos.filter(mv=>{
+    const d = parseISO(mv.data);
+    return d.getFullYear()===y && d.getMonth()===m;
+  });
+}
+
 function weekMovs(){
   const {start,end} = getWeekRange(state.weekRef);
   return state.movimentos.filter(m=>{
@@ -154,6 +167,8 @@ function weekMovs(){
 function render(){
   const {start,end} = getWeekRange(state.weekRef);
   document.getElementById('weekRange').textContent = `${formatBR(start)} – ${formatBR(end)}`;
+
+  document.getElementById('monthRange').textContent = monthLabel(state.monthRef);
 
   const names = [...new Set(state.movimentos.map(m=>m.nome))].sort();
   const dl = document.getElementById('nomesList');
@@ -299,7 +314,7 @@ function costureiroTotals(movs){
 
 function renderPersonTotals(){
   const wrap = document.getElementById('personTotalsWrap');
-  const totals = costureiroTotals(state.movimentos);
+  const totals = costureiroTotals(monthMovs());
   if(totals.length===0){
     wrap.innerHTML = `<div class="empty">Nenhum costureiro cadastrado ainda.</div>`;
     return;
@@ -326,7 +341,7 @@ function renderPersonTotals(){
 }
 
 function buildTotalsPrintReport(){
-  const totals = costureiroTotals(state.movimentos);
+  const totals = costureiroTotals(monthMovs());
   let totalLevou=0, totalTrouxe=0, totalValor=0;
   let rows = totals.map(t=>{
     totalLevou += t.levou; totalTrouxe += t.trouxe; totalValor += t.valorPagar;
@@ -334,8 +349,8 @@ function buildTotalsPrintReport(){
   }).join('') || `<tr><td colspan="5">Sem dados.</td></tr>`;
 
   document.getElementById('printReport').innerHTML = `
-    <h1>Total geral por costureiro</h1>
-    <div class="sub">Todas as semanas registradas — impresso em ${formatBR(new Date())}</div>
+    <h1>Total do mês por costureiro</h1>
+    <div class="sub">Mês de ${monthLabel(state.monthRef)} — impresso em ${formatBR(new Date())}</div>
     <table>
       <thead><tr><th>Costureiro</th><th>Saída</th><th>Entrada</th><th>Pendente</th><th>Valor a pagar</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -394,11 +409,23 @@ function initials(name){
   return ((parts[0]?.[0]||'') + (parts[1]?.[0]||'')).toUpperCase();
 }
 
+function grupoDe(nome){
+  return state.movimentos.some(m=>m.nome===nome && m.grupo==='financas') ? 'financas' : 'costureiro';
+}
+
+function renderTabs(){
+  document.querySelectorAll('#grupoTabs .tab').forEach(t=>{
+    t.classList.toggle('active', t.dataset.grupo===state.aba);
+  });
+}
+
 function renderPersonList(){
-  const names = [...new Set(state.movimentos.map(m=>m.nome))].sort();
+  renderTabs();
+  const names = [...new Set(state.movimentos.map(m=>m.nome))].sort().filter(n=>grupoDe(n)===state.aba);
+  if(state.selectedCostureiro && !names.includes(state.selectedCostureiro)) state.selectedCostureiro = null;
   const wrap = document.getElementById('personList');
   if(names.length===0){
-    wrap.innerHTML = `<div class="empty">Nenhum costureiro cadastrado ainda.</div>`;
+    wrap.innerHTML = `<div class="empty">${state.aba==='financas' ? 'Nenhum lançamento de finanças ainda.' : 'Nenhum costureiro cadastrado ainda.'}</div>`;
     return;
   }
   wrap.innerHTML = names.map(n=>`
@@ -417,7 +444,7 @@ function renderPersonList(){
 }
 
 function personMovs(name){
-  return state.movimentos.filter(m=>m.nome===name).slice().sort((a,b)=> (b.data+b.criadoEm).localeCompare(a.data+a.criadoEm));
+  return monthMovs().filter(m=>m.nome===name).slice().sort((a,b)=> (b.data+b.criadoEm).localeCompare(a.data+a.criadoEm));
 }
 
 function renderPersonDetail(){
@@ -428,12 +455,51 @@ function renderPersonDetail(){
     return;
   }
   const movs = personMovs(name);
+  const fin = grupoDe(name)==='financas';
   let levou=0, trouxe=0, valorPagar=0;
   movs.forEach(m=>{
     if(m.tipo==='saida'){ levou+=m.qtd; }
     else { trouxe+=m.qtd; valorPagar += (m.valorUnit||0)*m.qtd; }
   });
   const pend = levou-trouxe;
+
+  let receitas=0, despesas=0;
+  const porDesc = {};
+  if(fin){
+    movs.forEach(m=>{
+      const v = (m.valorUnit||0)*m.qtd;
+      const key = m.pedido.trim();
+      if(!porDesc[key]) porDesc[key] = {rec:0, desp:0};
+      if(m.tipo==='saida'){ despesas+=v; porDesc[key].desp+=v; }
+      else { receitas+=v; porDesc[key].rec+=v; }
+    });
+  }
+  const saldoFin = receitas - despesas;
+  const corSaldo = saldoFin<0 ? 'var(--thread)' : 'var(--ok)';
+
+  const finHead = `<h3>${escapeHtml(name)} — <span class="pend-inline" style="color:${corSaldo}">Saldo: ${formatMoney(saldoFin)}</span></h3>
+    <div class="stats-row">
+      <div class="stat">Receitas<b style="color:var(--ok)">${formatMoney(receitas)}</b></div>
+      <div class="stat">Despesas<b style="color:var(--thread)">${formatMoney(despesas)}</b></div>
+      <div class="stat">Saldo<b style="color:${corSaldo}">${formatMoney(saldoFin)}</b></div>
+      <div class="stat">Lançamentos<b>${movs.length}</b></div>
+    </div>`;
+  const finRows = Object.keys(porDesc).sort().map(k=>`<tr><td>${escapeHtml(k)}</td><td>${formatMoney(porDesc[k].rec)}</td><td>${formatMoney(porDesc[k].desp)}</td><td>${formatMoney(porDesc[k].rec-porDesc[k].desp)}</td></tr>`).join('') || '<tr><td colspan="4">Sem lançamentos.</td></tr>';
+  const finTable = `<div style="overflow-x:auto;"><table class="entries">
+      <thead><tr><th>Descrição</th><th>Receitas</th><th>Despesas</th><th>Saldo</th></tr></thead>
+      <tbody>${finRows}</tbody>
+    </table></div>`;
+  const finHistRows = movs.map(m=>`<tr>
+          <td>${formatBR(parseISO(m.data))}</td>
+          <td>${escapeHtml(m.pedido)}</td>
+          <td>${movValorDisplay(m)}</td>
+          <td><span class="badge ${m.tipo}">${m.tipo==='saida'?'Despesa':'Receita'}</span></td>
+          <td><button class="delbtn" data-id="${m.id}" title="Excluir">✕</button></td>
+        </tr>`).join('') || '<tr><td colspan="5">Sem lançamentos.</td></tr>';
+  const finHist = `<table class="entries">
+        <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th>Tipo</th><th></th></tr></thead>
+        <tbody>${finHistRows}</tbody>
+      </table>`;
 
   const prods = productTotals(movs);
   let prodRows = prods.map(p=>{
@@ -460,25 +526,31 @@ function renderPersonDetail(){
     </tr>`).join('') || `<tr><td colspan="8">Sem movimentos registrados.</td></tr>`;
 
   el.innerHTML = `<div class="person-panel">
-    <h3>Perfil: ${escapeHtml(name)} — <span class="pend-inline">Saldo pendente: ${pend}</span></h3>
+    <button type="button" class="movelink" id="moveGrupoBtn">${grupoDe(name)==='financas' ? '↔ Mover para Costureiros' : '↔ Mover para Finanças'}</button>
+    ${fin ? finHead : `<h3>Perfil: ${escapeHtml(name)} — <span class="pend-inline">Saldo pendente: ${pend}</span></h3>
     <div class="stats-row">
       <div class="stat">Total de saídas<b>${levou}</b></div>
       <div class="stat">Total de entradas<b>${trouxe}</b></div>
       <div class="stat">Saldo pendente<b style="color:${pend>0?'var(--thread)':'var(--ok)'}">${pend}</b></div>
       <div class="stat">Valor a pagar<b>${formatMoney(valorPagar)}</b></div>
-    </div>
-    <div style="overflow-x:auto;"><table class="entries">
+    </div>`}
+    ${fin ? finTable : `<div style="overflow-x:auto;"><table class="entries">
       <thead><tr><th>Produto</th><th>Qtd. saída</th><th>Qtd. entrada</th><th>Saldo</th><th>Valor a pagar</th></tr></thead>
       <tbody>${prodRows}</tbody>
-    </table></div>
+    </table></div>`}
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px;">
     <button type="button" class="section-toggle" id="toggleHistBtn">Ver histórico detalhado ▾</button>
-    <div id="histWrap" style="display:none;overflow-x:auto;">
-      <table class="entries">
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="printbtn clearbtn" style="margin-right:0;" id="clearPersonBtn">🗑 Limpar tudo</button>
+        <button class="printbtn" id="printPersonBtn">🖨 Imprimir ficha de ${escapeHtml(name)}</button>
+      </div>
+    </div>
+    <div id="histWrap" style="display:none;overflow-x:auto;margin-top:8px;">
+      ${fin ? finHist : `<table class="entries">
         <thead><tr><th>Data</th><th>Pedido</th><th>Tam.</th><th>Cor</th><th>Qtd</th><th>Valor</th><th>Tipo</th><th></th></tr></thead>
         <tbody>${entryRows}</tbody>
-      </table>
+      </table>`}
     </div>
-    <button class="printbtn" style="margin-top:12px;" id="printPersonBtn">🖨 Imprimir ficha de ${escapeHtml(name)}</button>
   </div>`;
 
   document.getElementById('toggleHistBtn').addEventListener('click', (e)=>{
@@ -492,14 +564,78 @@ function renderPersonDetail(){
     btn.addEventListener('click', ()=> deleteMov(btn.dataset.id));
   });
 
+  document.getElementById('moveGrupoBtn').addEventListener('click', async ()=>{
+    const novo = grupoDe(name)==='financas' ? 'costureiro' : 'financas';
+    state.movimentos.forEach(m=>{ if(m.nome===name) m.grupo = novo; });
+    await saveData();
+    state.aba = novo;
+    render();
+  });
+
+  document.getElementById('clearPersonBtn').addEventListener('click', ()=>{
+    if(movs.length===0) return;
+    confirmModal({
+      title: 'Limpar tudo?',
+      message: `Todos os <b>${movs.length}</b> movimentos de <b>${escapeHtml(name)}</b> em <b>${escapeHtml(monthLabel(state.monthRef))}</b> serão apagados. Isso não pode ser desfeito.`,
+      confirmText: 'Limpar tudo',
+      onConfirm: async ()=>{
+        const ids = new Set(movs.map(m=>m.id));
+        state.movimentos = state.movimentos.filter(m=>!ids.has(m.id));
+        await saveData();
+        render();
+      }
+    });
+  });
+
   document.getElementById('printPersonBtn').addEventListener('click', ()=>{
     buildPersonPrintReport(name);
     window.print();
   });
 }
 
+function confirmModal({title, message, confirmText, onConfirm}){
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-icon">🗑</div>
+    <h3>${title}</h3>
+    <p>${message}</p>
+    <div class="modal-actions">
+      <button type="button" class="modal-cancel">Cancelar</button>
+      <button type="button" class="modal-confirm">${confirmText}</button>
+    </div>
+  </div>`;
+  const close = ()=>{ overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e)=>{ if(e.key==='Escape') close(); };
+  overlay.addEventListener('click', (e)=>{ if(e.target===overlay) close(); });
+  overlay.querySelector('.modal-cancel').addEventListener('click', close);
+  overlay.querySelector('.modal-confirm').addEventListener('click', async ()=>{ close(); await onConfirm(); });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(overlay);
+  overlay.querySelector('.modal-cancel').focus();
+}
+
 function buildPersonPrintReport(name){
   const movs = personMovs(name).slice().sort((a,b)=> a.data.localeCompare(b.data));
+  if(grupoDe(name)==='financas'){
+    let rec=0, desp=0;
+    const linhas = movs.map(m=>{
+      const v = (m.valorUnit||0)*m.qtd;
+      if(m.tipo==='saida') desp+=v; else rec+=v;
+      return `<tr><td>${formatBR(parseISO(m.data))}</td><td>${escapeHtml(m.pedido)}</td><td>${formatMoney(v)}</td><td>${m.tipo==='saida'?'Despesa':'Receita'}</td></tr>`;
+    }).join('') || `<tr><td colspan="4">Sem lançamentos.</td></tr>`;
+    document.getElementById('printReport').innerHTML = `
+      <h1>Finanças — ${escapeHtml(name)}</h1>
+      <div class="sub">${monthLabel(state.monthRef)} — impresso em ${formatBR(new Date())}</div>
+      <table>
+        <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th>Tipo</th></tr></thead>
+        <tbody>${linhas}</tbody>
+        <tfoot><tr><td colspan="2">Receitas: ${formatMoney(rec)}</td><td colspan="2">Despesas: ${formatMoney(desp)}</td></tr></tfoot>
+      </table>
+      <p style="font-family:'IBM Plex Mono',monospace;font-size:13px;">Saldo: ${formatMoney(rec-desp)}</p>
+    `;
+    return;
+  }
   let levou=0, trouxe=0, valorPagar=0;
   movs.forEach(m=>{
     if(m.tipo==='saida'){ levou+=m.qtd; }
@@ -524,7 +660,7 @@ function buildPersonPrintReport(name){
 
   document.getElementById('printReport').innerHTML = `
     <h1>Ficha do costureiro — ${escapeHtml(name)}</h1>
-    <div class="sub">Histórico completo — impresso em ${formatBR(new Date())}</div>
+    <div class="sub">Histórico de ${monthLabel(state.monthRef)} — impresso em ${formatBR(new Date())}</div>
     <h2>Por produto</h2>
     <table>
       <thead><tr><th>Produto</th><th>Saída</th><th>Entrada</th><th>Saldo</th><th>Valor a pagar</th></tr></thead>
@@ -540,11 +676,26 @@ function buildPersonPrintReport(name){
   `;
 }
 
+function isFinForm(){ return document.getElementById('ehFinanca').checked; }
+
 function updateValorFieldVisibility(){
   const valorField = document.getElementById('valorField');
-  const isEntrada = state.tipoAtual === 'retorno';
-  valorField.style.display = isEntrada ? 'block' : 'none';
-  if(!isEntrada) document.getElementById('valorUnit').value = '';
+  const mostrar = state.tipoAtual === 'retorno' || isFinForm();
+  valorField.style.display = mostrar ? 'block' : 'none';
+  if(!mostrar) document.getElementById('valorUnit').value = '';
+}
+
+function applyFormMode(){
+  const fin = isFinForm();
+  document.getElementById('nomeLabel').textContent = fin ? 'Conta / Categoria' : 'Costureiro(a)';
+  document.getElementById('nome').placeholder = fin ? 'Ex: Cartão, Compras, Vendas' : 'Nome';
+  document.getElementById('pedidoLabel').textContent = fin ? 'Descrição' : 'Pedido';
+  document.getElementById('pedido').placeholder = fin ? 'Ex: Mercado Livre, Nubank' : 'Ex: vestido floral, calça jeans';
+  document.getElementById('tamCorRow').style.display = fin ? 'none' : 'grid';
+  document.getElementById('qtdField').style.display = fin ? 'none' : 'block';
+  document.getElementById('segSaida').textContent = fin ? 'Despesa' : 'Saída';
+  document.getElementById('segRetorno').textContent = fin ? 'Receita' : 'Entrada';
+  updateValorFieldVisibility();
 }
 
 document.querySelectorAll('.seg-btn').forEach(btn=>{
@@ -555,30 +706,38 @@ document.querySelectorAll('.seg-btn').forEach(btn=>{
     updateValorFieldVisibility();
   });
 });
-updateValorFieldVisibility();
+applyFormMode();
+document.getElementById('ehFinanca').addEventListener('change', applyFormMode);
 
 document.getElementById('addBtn').addEventListener('click', async ()=>{
   const nome = document.getElementById('nome').value.trim();
   const pedido = document.getElementById('pedido').value.trim();
   const tamanho = document.getElementById('tamanho').value.trim();
   const cor = document.getElementById('cor').value.trim();
-  const qtd = parseInt(document.getElementById('qtd').value, 10);
+  const fin = isFinForm();
+  const qtd = fin ? 1 : parseInt(document.getElementById('qtd').value, 10);
   const valorUnit = parseFloat(document.getElementById('valorUnit').value) || 0;
   const dataVal = document.getElementById('data').value;
   const errEl = document.getElementById('errMsg');
 
   if(!nome || !pedido || !qtd || qtd<=0 || !dataVal){
-    errEl.textContent = 'Preencha nome, pedido, quantidade e data.';
+    errEl.textContent = fin ? 'Preencha conta, descrição, valor e data.' : 'Preencha nome, pedido, quantidade e data.';
+    return;
+  }
+  if(fin && !(valorUnit>0)){
+    errEl.textContent = 'Preencha conta, descrição, valor e data.';
     return;
   }
   errEl.textContent = '';
 
   state.movimentos.push({
     id: 'm_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
-    nome, pedido, tamanho, cor, qtd, valorUnit, data: dataVal, tipo: state.tipoAtual,
+    nome, pedido, tamanho: fin ? '' : tamanho, cor: fin ? '' : cor, qtd, valorUnit, data: dataVal, tipo: state.tipoAtual,
+    grupo: fin ? 'financas' : 'costureiro',
     criadoEm: new Date().toISOString()
   });
   await saveData();
+  state.aba = document.getElementById('ehFinanca').checked ? 'financas' : 'costureiro';
 
   document.getElementById('pedido').value='';
   document.getElementById('tamanho').value='';
@@ -598,6 +757,34 @@ document.getElementById('nextWeek').addEventListener('click', ()=>{
 });
 document.getElementById('thisWeek').addEventListener('click', ()=>{
   state.weekRef = new Date();
+  render();
+});
+
+document.querySelectorAll('#grupoTabs .tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    state.aba = t.dataset.grupo;
+    state.selectedCostureiro = null;
+    render();
+  });
+});
+document.getElementById('nome').addEventListener('input', (e)=>{
+  const n = e.target.value.trim();
+  if(state.movimentos.some(m=>m.nome===n)){
+    document.getElementById('ehFinanca').checked = grupoDe(n)==='financas';
+    applyFormMode();
+  }
+});
+
+document.getElementById('prevMonth').addEventListener('click', ()=>{
+  state.monthRef = new Date(state.monthRef.getFullYear(), state.monthRef.getMonth()-1, 1);
+  render();
+});
+document.getElementById('nextMonth').addEventListener('click', ()=>{
+  state.monthRef = new Date(state.monthRef.getFullYear(), state.monthRef.getMonth()+1, 1);
+  render();
+});
+document.getElementById('thisMonth').addEventListener('click', ()=>{
+  state.monthRef = new Date();
   render();
 });
 

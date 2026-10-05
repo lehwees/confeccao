@@ -68,6 +68,12 @@
           <button id="nextWeek" class="navbtn" title="Próxima semana">›</button>
           <button id="thisWeek" class="linkbtn">hoje</button>
         </div>
+        <div class="week-controls month-controls">
+          <button id="prevMonth" class="navbtn" title="Mês anterior">‹</button>
+          <div class="range" id="monthRange">carregando…</div>
+          <button id="nextMonth" class="navbtn" title="Próximo mês">›</button>
+          <button id="thisMonth" class="linkbtn">mês atual</button>
+        </div>
         <div class="print-menu-wrap">
           <button class="primary" id="printMenuBtn">Imprimir ▾</button>
           <div class="print-menu" id="printMenu">
@@ -99,14 +105,14 @@
               class="seg-btn saida active"
               data-tipo="saida"
             >
-              Saída
+              <span id="segSaida">Saída</span>
             </button>
             <button type="button" class="seg-btn retorno" data-tipo="retorno">
-              Entrada
+              <span id="segRetorno">Entrada</span>
             </button>
           </div>
 
-          <label for="nome">Costureiro(a)</label>
+          <label for="nome" id="nomeLabel">Costureiro(a)</label>
           <input
             id="nome"
             list="nomesList"
@@ -115,10 +121,15 @@
           />
           <datalist id="nomesList"></datalist>
 
-          <label for="pedido">Pedido</label>
+          <label class="check-row" for="ehFinanca">
+            <input id="ehFinanca" type="checkbox" />
+            <span>Lançamento de Finanças</span>
+          </label>
+
+          <label for="pedido" id="pedidoLabel">Pedido</label>
           <input id="pedido" placeholder="Ex: vestido floral, calça jeans" />
 
-          <div class="field-row">
+          <div class="field-row" id="tamCorRow">
             <div>
               <label for="tamanho">Tamanho</label>
               <input id="tamanho" placeholder="Ex: P, M, G, 40" />
@@ -129,11 +140,13 @@
             </div>
           </div>
 
-          <label for="qtd">Quantidade</label>
-          <input id="qtd" type="number" min="1" step="1" placeholder="0" />
+          <div id="qtdField">
+            <label for="qtd">Quantidade</label>
+            <input id="qtd" type="number" min="1" step="1" placeholder="0" />
+          </div>
 
           <div id="valorField">
-            <label for="valorUnit">Valor (R$)</label>
+            <label for="valorUnit" id="valorLabel">Valor (R$)</label>
             <input
               id="valorUnit"
               type="number"
@@ -151,7 +164,10 @@
         </div>
 
         <div class="board">
-          <div class="board-head"><h2>Costureiros</h2></div>
+          <div class="tabs" id="grupoTabs">
+            <button type="button" class="tab active" data-grupo="costureiro">Costureiros</button>
+            <button type="button" class="tab" data-grupo="financas">Finanças</button>
+          </div>
           <div class="person-list" id="personList"></div>
           <div id="personDetail"></div>
         </div>

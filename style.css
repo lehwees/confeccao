@@ -15,8 +15,12 @@
 * {
   box-sizing: border-box;
 }
+html {
+  background: var(--cream);
+}
 body {
   margin: 0;
+  min-height: 100vh;
   background: var(--cream);
   color: var(--ink);
   font-family: "Work Sans", sans-serif;
@@ -722,5 +726,180 @@ table.entries tr:last-child td {
   body.print-receipt #printReceipt pre {
     font-size: 12px;
     line-height: 1.35;
+  }
+}
+
+.printbtn.clearbtn {
+  margin-right: 8px;
+  background: transparent;
+  color: var(--thread);
+  border: 1.5px solid var(--thread);
+}
+.printbtn.clearbtn:hover {
+  background: var(--thread);
+  color: #fff;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 20, 28, 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+  animation: modalFade 0.15s ease-out;
+}
+.modal {
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 14px;
+  padding: 28px 26px 22px;
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  animation: modalPop 0.18s ease-out;
+}
+.modal-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: rgba(179, 58, 58, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+.modal h3 {
+  font-family: "Fraunces", serif;
+  font-size: 22px;
+  margin: 0 0 8px;
+  color: var(--denim-dark);
+}
+.modal p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 0 0 22px;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+}
+.modal-actions button {
+  flex: 1;
+  padding: 11px 14px;
+  border-radius: 8px;
+  font-family: "Work Sans", sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+.modal-cancel {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.modal-cancel:hover {
+  background: var(--cream);
+}
+.modal-confirm {
+  background: var(--thread);
+  border: 1px solid var(--thread);
+  color: #fff;
+}
+.modal-confirm:hover {
+  background: var(--thread-dark);
+}
+@keyframes modalFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modalPop {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@media print {
+  .modal-overlay { display: none !important; }
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+.tab {
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 8px 16px;
+  margin-bottom: -1px;
+  font-family: "Fraunces", serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.tab:hover {
+  color: var(--denim-dark);
+}
+.tab.active {
+  color: var(--denim-dark);
+  border-bottom-color: var(--tape);
+}
+label.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+}
+.check-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--tape);
+  cursor: pointer;
+}
+.printbtn.movebtn {
+  background: var(--denim);
+}
+.printbtn.movebtn:hover {
+  background: var(--denim-dark);
+}
+
+.person-panel {
+  position: relative;
+}
+.movelink {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  font-family: "Work Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.movelink:hover {
+  color: var(--denim-dark);
+}
+@media (max-width: 760px) {
+  .movelink {
+    position: static;
+    display: block;
+    margin-bottom: 8px;
   }
 }
