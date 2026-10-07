@@ -903,3 +903,44 @@ label.check-row {
     margin-bottom: 8px;
   }
 }
+
+/* Fechamento semanal por pessoa */
+.week-block {
+  margin-top: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--line, rgba(255,255,255,.15));
+  border-radius: 8px;
+}
+.week-block.paid { border-color: #2e7d32; background: rgba(46,125,50,.10); }
+.week-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.week-head .week-total {
+  margin-left: auto;
+  font-family: "IBM Plex Mono", monospace;
+}
+.paybtn {
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ink-soft, #999);
+  background: transparent;
+  color: var(--ink-soft, #999);
+  font: inherit;
+  font-size: 13px;
+}
+.paybtn.paid { background: #2e7d32; border-color: #2e7d32; color: #fff; }
+@media print { .paybtn { display: none; } }
+.week-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+@media print { .week-actions, .weekhist { display: none !important; } }

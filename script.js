@@ -1,5 +1,7 @@
 const state = {
   movimentos: [],
+  pagamentos: {},
+  semanasAbertas: new Set(),
   tipoAtual: 'saida',
   weekRef: new Date(),
   monthRef: new Date(),
@@ -42,9 +44,20 @@ function showLogin(){
   document.getElementById('appMain').style.display = 'none';
 }
 
+// Desfaz o antigo "Juntar mês": devolve cada movimento à data em que foi cadastrado
+function restoreMergedDates(){
+  let changed = false;
+  state.movimentos.forEach(m=>{
+    if(m.dataOriginal){ m.data = m.dataOriginal; delete m.dataOriginal; changed = true; }
+  });
+  if(changed) saveData();
+}
+
 function attachFirestoreListener(){
   docRef.onSnapshot(snap=>{
     state.movimentos = (snap.exists && snap.data().movimentos) ? snap.data().movimentos : [];
+    state.pagamentos = (snap.exists && snap.data().pagamentos) || {};
+    restoreMergedDates();
     setSyncStatus('online');
     render();
   }, err=>{
@@ -90,16 +103,19 @@ function loadLocal(){
   try{
     const raw = localStorage.getItem('ficha_atelie_movimentos');
     state.movimentos = raw ? JSON.parse(raw) : [];
+    state.pagamentos = JSON.parse(localStorage.getItem('ficha_atelie_pagamentos') || '{}');
   }catch(e){
     state.movimentos = [];
+    state.pagamentos = {};
   }
+  restoreMergedDates();
   render();
 }
 
 async function saveData(){
   if(useCloud && docRef){
     try{
-      await docRef.set({movimentos: state.movimentos}, {merge:true});
+      await docRef.set({movimentos: state.movimentos, pagamentos: state.pagamentos}, {merge:true});
       return;
     }catch(e){
       console.error('Falha ao salvar na nuvem, salvando local', e);
@@ -107,6 +123,7 @@ async function saveData(){
   }
   try{
     localStorage.setItem('ficha_atelie_movimentos', JSON.stringify(state.movimentos));
+    localStorage.setItem('ficha_atelie_pagamentos', JSON.stringify(state.pagamentos));
   }catch(e){
     console.error('Falha ao salvar', e);
   }
@@ -463,14 +480,6 @@ function renderPersonDetail(){
   });
   const pend = levou-trouxe;
 
-  const prevRef = new Date(state.monthRef.getFullYear(), state.monthRef.getMonth()-1, 1);
-  const prevLabel = monthLabel(prevRef);
-  const prevMovs = state.movimentos.filter(m=>{
-    if(m.nome!==name) return false;
-    const d = parseISO(m.data);
-    return d.getFullYear()===prevRef.getFullYear() && d.getMonth()===prevRef.getMonth();
-  });
-
   let receitas=0, despesas=0;
   const porDesc = {};
   if(fin){
@@ -509,19 +518,7 @@ function renderPersonDetail(){
         <tbody>${finHistRows}</tbody>
       </table>`;
 
-  const prods = productTotals(movs);
-  let prodRows = prods.map(p=>{
-    const pPend = p.levou - p.trouxe;
-    return `<tr>
-      <td>${escapeHtml(p.label)}</td>
-      <td>${p.levou}</td>
-      <td>${p.trouxe}</td>
-      <td>${formatSaldo(pPend)}</td>
-      <td>${formatMoney(p.valorPagar)}</td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="5">Sem produtos registrados.</td></tr>`;
-
-  let entryRows = movs.map(m=>`
+  const rowHtml = m=>`
     <tr>
       <td>${formatBR(parseISO(m.data))}</td>
       <td>${escapeHtml(m.pedido)}</td>
@@ -531,7 +528,48 @@ function renderPersonDetail(){
       <td>${movValorDisplay(m)}</td>
       <td><span class="badge ${m.tipo}">${m.tipo==='saida'?'Saída':'Entrada'}</span></td>
       <td><button class="delbtn" data-id="${m.id}" title="Excluir">✕</button></td>
-    </tr>`).join('') || `<tr><td colspan="8">Sem movimentos registrados.</td></tr>`;
+    </tr>`;
+  const mesKey = `${state.monthRef.getFullYear()}-${String(state.monthRef.getMonth()+1).padStart(2,'0')}`;
+  const semanas = {};
+  movs.forEach(m=>{
+    const ini = toISODate(getWeekRange(parseISO(m.data)).start);
+    (semanas[ini] = semanas[ini] || []).push(m);
+  });
+  const payKey = ini => `${name}|${ini}|${mesKey}`;
+  const weekBlocks = Object.keys(semanas).sort().reverse().map(ini=>{
+    const ms = semanas[ini];
+    const {start,end} = getWeekRange(parseISO(ini));
+    const ws = productTotals(ms);
+    const total = ws.reduce((a,p)=>a+p.valorPagar,0);
+    const pago = !!state.pagamentos[payKey(ini)];
+    const rows = ws.map(p=>`<tr>
+      <td>${escapeHtml(p.label)}</td><td>${p.levou}</td><td>${p.trouxe}</td>
+      <td>${formatSaldo(p.levou-p.trouxe)}</td><td>${formatMoney(p.valorPagar)}</td></tr>`).join('');
+    const aberta = state.semanasAbertas.has(payKey(ini));
+    return `<div class="week-block${pago?' paid':''}">
+      <div class="week-head">
+        <b>Semana ${formatBR(start)} – ${formatBR(end)}</b>
+        <span class="week-total">${formatMoney(total)}</span>
+        <button type="button" class="paybtn${pago?' paid':''}" data-week="${ini}">${pago?'✓ Pago':'Pago?'}</button>
+      </div>
+      <div style="overflow-x:auto;"><table class="entries">
+        <thead><tr><th>Produto</th><th>Qtd. saída</th><th>Qtd. entrada</th><th>Saldo</th><th>Valor a pagar</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <div class="week-actions">
+        <button type="button" class="section-toggle weekhist-btn" data-week="${ini}">${aberta?'Ocultar histórico da semana ▴':'Ver histórico da semana ▾'}</button>
+        <button type="button" class="printbtn clearbtn clearweek-btn" style="margin-right:0;" data-week="${ini}">🗑 Limpar semana</button>
+      </div>
+      <div class="weekhist" style="display:${aberta?'block':'none'};overflow-x:auto;margin-top:8px;">
+        <table class="entries">
+          <thead><tr><th>Data</th><th>Pedido</th><th>Tam.</th><th>Cor</th><th>Qtd</th><th>Valor</th><th>Tipo</th><th></th></tr></thead>
+          <tbody>${ms.map(rowHtml).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('') || '<p style="color:var(--ink-soft);">Sem produtos registrados.</p>';
+
+  let entryRows = movs.map(rowHtml).join('') || `<tr><td colspan="8">Sem movimentos registrados.</td></tr>`;
 
   el.innerHTML = `<div class="person-panel">
     <button type="button" class="movelink" id="moveGrupoBtn">${grupoDe(name)==='financas' ? '↔ Mover para Costureiros' : '↔ Mover para Finanças'}</button>
@@ -542,14 +580,10 @@ function renderPersonDetail(){
       <div class="stat">Saldo pendente<b style="color:${pend>0?'var(--thread)':'var(--ok)'}">${pend}</b></div>
       <div class="stat">Valor a pagar<b>${formatMoney(valorPagar)}</b></div>
     </div>`}
-    ${fin ? finTable : `<div style="overflow-x:auto;"><table class="entries">
-      <thead><tr><th>Produto</th><th>Qtd. saída</th><th>Qtd. entrada</th><th>Saldo</th><th>Valor a pagar</th></tr></thead>
-      <tbody>${prodRows}</tbody>
-    </table></div>`}
+    ${fin ? finTable : weekBlocks}
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px;">
     <button type="button" class="section-toggle" id="toggleHistBtn">Ver histórico detalhado ▾</button>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        ${prevMovs.length ? `<button type="button" class="printbtn" style="margin-right:0;" id="mergePrevBtn">⇢ Juntar ${escapeHtml(prevLabel.split(' ')[0])} aqui</button>` : ''}
+      <div style="display:flex;gap:8px;">
         <button type="button" class="printbtn clearbtn" style="margin-right:0;" id="clearPersonBtn">🗑 Limpar tudo</button>
         <button class="printbtn" id="printPersonBtn">🖨 Imprimir ficha de ${escapeHtml(name)}</button>
       </div>
@@ -573,6 +607,47 @@ function renderPersonDetail(){
     btn.addEventListener('click', ()=> deleteMov(btn.dataset.id));
   });
 
+  el.querySelectorAll('.paybtn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const k = payKey(btn.dataset.week);
+      if(state.pagamentos[k]) delete state.pagamentos[k]; else state.pagamentos[k] = true;
+      await saveData();
+      render();
+    });
+  });
+
+  el.querySelectorAll('.weekhist-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const k = payKey(btn.dataset.week);
+      const box = btn.closest('.week-block').querySelector('.weekhist');
+      const abrir = box.style.display === 'none';
+      box.style.display = abrir ? 'block' : 'none';
+      btn.textContent = abrir ? 'Ocultar histórico da semana ▴' : 'Ver histórico da semana ▾';
+      if(abrir) state.semanasAbertas.add(k); else state.semanasAbertas.delete(k);
+    });
+  });
+
+  el.querySelectorAll('.clearweek-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const ini = btn.dataset.week;
+      const ms = semanas[ini] || [];
+      if(ms.length===0) return;
+      const {start,end} = getWeekRange(parseISO(ini));
+      confirmModal({
+        title: 'Limpar semana?',
+        message: `Os <b>${ms.length}</b> movimentos de <b>${escapeHtml(name)}</b> na semana <b>${formatBR(start)} – ${formatBR(end)}</b> serão apagados. Isso não pode ser desfeito.`,
+        confirmText: 'Limpar semana',
+        onConfirm: async ()=>{
+          const ids = new Set(ms.map(m=>m.id));
+          state.movimentos = state.movimentos.filter(m=>!ids.has(m.id));
+          delete state.pagamentos[payKey(ini)];
+          await saveData();
+          render();
+        }
+      });
+    });
+  });
+
   document.getElementById('moveGrupoBtn').addEventListener('click', async ()=>{
     const novo = grupoDe(name)==='financas' ? 'costureiro' : 'financas';
     state.movimentos.forEach(m=>{ if(m.nome===name) m.grupo = novo; });
@@ -580,26 +655,6 @@ function renderPersonDetail(){
     state.aba = novo;
     render();
   });
-
-  const mergeBtn = document.getElementById('mergePrevBtn');
-  if(mergeBtn){
-    mergeBtn.addEventListener('click', ()=>{
-      confirmModal({
-        title: 'Juntar mês anterior?',
-        message: `Os <b>${prevMovs.length}</b> movimentos de <b>${escapeHtml(name)}</b> em <b>${escapeHtml(prevLabel)}</b> serão movidos para <b>${escapeHtml(monthLabel(state.monthRef))}</b>.`,
-        confirmText: 'Juntar',
-        onConfirm: async ()=>{
-          const ids = new Set(prevMovs.map(m=>m.id));
-          const novaData = toISODate(new Date(state.monthRef.getFullYear(), state.monthRef.getMonth(), 1));
-          state.movimentos.forEach(m=>{
-            if(ids.has(m.id)){ m.dataOriginal = m.data; m.data = novaData; }
-          });
-          await saveData();
-          render();
-        }
-      });
-    });
-  }
 
   document.getElementById('clearPersonBtn').addEventListener('click', ()=>{
     if(movs.length===0) return;
