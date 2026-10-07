@@ -530,8 +530,7 @@ function renderPersonDetail(){
       <td><span class="badge ${m.tipo}">${m.tipo==='saida'?'Saída':'Entrada'}</span></td>
       <td><button class="delbtn" data-id="${m.id}" title="Excluir">✕</button></td>
     </tr>`;
-  const prods = productTotals(movs);
-  const prodRows = prods.map(p=>`<tr>
+  const prodRowsHtml = list=>list.map(p=>`<tr>
       <td>${escapeHtml(p.label)}</td>
       <td>${p.levou}</td>
       <td>${p.trouxe}</td>
@@ -561,6 +560,11 @@ function renderPersonDetail(){
       </div>
       <div class="weekhist" style="display:${aberta?'block':'none'};">
         <div style="overflow-x:auto;"><table class="entries">
+          <thead><tr><th>Produto</th><th>Qtd. saída</th><th>Qtd. entrada</th><th>Saldo</th><th>Valor a pagar</th></tr></thead>
+          <tbody>${prodRowsHtml(productTotals(ms))}</tbody>
+        </table></div>
+        <div class="week-sub">Lançamentos da semana</div>
+        <div style="overflow-x:auto;"><table class="entries">
           <thead><tr><th>Data</th><th>Pedido</th><th>Tam.</th><th>Cor</th><th>Qtd</th><th>Valor</th><th>Tipo</th><th></th></tr></thead>
           <tbody>${ms.map(rowHtml).join('')}</tbody>
         </table></div>
@@ -572,6 +576,8 @@ function renderPersonDetail(){
   }).join('') || '<p style="color:var(--ink-soft);">Sem movimentos registrados.</p>';
 
 
+  const entryRows = movs.map(rowHtml).join('') || `<tr><td colspan="8">Sem movimentos registrados.</td></tr>`;
+
   el.innerHTML = `<div class="person-panel">
     <button type="button" class="movelink" id="moveGrupoBtn">${grupoDe(name)==='financas' ? '↔ Mover para Costureiros' : '↔ Mover para Finanças'}</button>
     ${fin ? finHead : `<h3>Perfil: ${escapeHtml(name)} — <span class="pend-inline">Saldo pendente: ${pend}</span></h3>
@@ -581,10 +587,7 @@ function renderPersonDetail(){
       <div class="stat">Saldo pendente<b style="color:${pend>0?'var(--thread)':'var(--ok)'}">${pend}</b></div>
       <div class="stat">Valor a pagar<b>${formatMoney(valorPagar)}</b></div>
     </div>`}
-    ${fin ? finTable : `<div style="overflow-x:auto;"><table class="entries">
-      <thead><tr><th>Produto</th><th>Qtd. saída</th><th>Qtd. entrada</th><th>Saldo</th><th>Valor a pagar</th></tr></thead>
-      <tbody>${prodRows}</tbody>
-    </table></div>`}
+    ${fin ? finTable : weekBlocks}
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px;">
     <button type="button" class="section-toggle" id="toggleHistBtn">${state.histAberto.has(name)?'Ocultar histórico detalhado ▴':'Ver histórico detalhado ▾'}</button>
       <div style="display:flex;gap:8px;">
@@ -593,7 +596,10 @@ function renderPersonDetail(){
       </div>
     </div>
     <div id="histWrap" style="display:${state.histAberto.has(name)?'block':'none'};overflow-x:auto;margin-top:8px;">
-      ${fin ? finHist : weekBlocks}
+      ${fin ? finHist : `<table class="entries">
+        <thead><tr><th>Data</th><th>Pedido</th><th>Tam.</th><th>Cor</th><th>Qtd</th><th>Valor</th><th>Tipo</th><th></th></tr></thead>
+        <tbody>${entryRows}</tbody>
+      </table>`}
     </div>
   </div>`;
 

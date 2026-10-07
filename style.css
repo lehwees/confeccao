@@ -285,9 +285,12 @@ header.top .sub {
 }
 .person-panel .stats-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: 1fr 1fr 1fr 1.6fr;
   gap: 12px;
   margin-bottom: 18px;
+}
+@media (max-width: 700px) {
+  .person-panel .stats-row { grid-template-columns: 1fr 1fr; }
 }
 .person-panel .stat {
   text-align: center;
@@ -306,6 +309,7 @@ header.top .sub {
   color: var(--ink);
   letter-spacing: 0;
   margin-top: 4px;
+  white-space: nowrap;
 }
 .status-dot {
   display: inline-block;
@@ -948,3 +952,4 @@ label.check-row {
 .week-head .week-arrow { width: 14px; color: var(--ink-soft, #999); }
 .week-head .week-count { font-size: 12px; color: var(--ink-soft, #999); }
 .week-block .weekhist { margin-top: 6px; }
+.week-sub { margin: 12px 0 4px; font-size: 12px; color: var(--ink-soft, #999); text-transform: uppercase; letter-spacing: .04em; }
