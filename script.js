@@ -519,6 +519,13 @@ function renderPersonDetail(){
         <tbody>${finHistRows}</tbody>
       </table>`;
 
+  const prodRowsHtml = list=>list.map(p=>`<tr>
+      <td>${escapeHtml(p.label)}</td>
+      <td>${p.levou}</td>
+      <td>${p.trouxe}</td>
+      <td>${formatSaldo(p.levou-p.trouxe)}</td>
+      <td>${formatMoney(p.valorPagar)}</td>
+    </tr>`).join('') || `<tr><td colspan="5">Sem produtos registrados.</td></tr>`;
   const rowHtml = m=>`
     <tr>
       <td>${formatBR(parseISO(m.data))}</td>
@@ -530,13 +537,6 @@ function renderPersonDetail(){
       <td><span class="badge ${m.tipo}">${m.tipo==='saida'?'Saída':'Entrada'}</span></td>
       <td><button class="delbtn" data-id="${m.id}" title="Excluir">✕</button></td>
     </tr>`;
-  const prodRowsHtml = list=>list.map(p=>`<tr>
-      <td>${escapeHtml(p.label)}</td>
-      <td>${p.levou}</td>
-      <td>${p.trouxe}</td>
-      <td>${formatSaldo(p.levou-p.trouxe)}</td>
-      <td>${formatMoney(p.valorPagar)}</td>
-    </tr>`).join('') || `<tr><td colspan="5">Sem produtos registrados.</td></tr>`;
   const mesKey = `${state.monthRef.getFullYear()}-${String(state.monthRef.getMonth()+1).padStart(2,'0')}`;
   const semanas = {};
   movs.forEach(m=>{
@@ -563,18 +563,12 @@ function renderPersonDetail(){
           <thead><tr><th>Produto</th><th>Qtd. saída</th><th>Qtd. entrada</th><th>Saldo</th><th>Valor a pagar</th></tr></thead>
           <tbody>${prodRowsHtml(productTotals(ms))}</tbody>
         </table></div>
-        <div class="week-sub">Lançamentos da semana</div>
-        <div style="overflow-x:auto;"><table class="entries">
-          <thead><tr><th>Data</th><th>Pedido</th><th>Tam.</th><th>Cor</th><th>Qtd</th><th>Valor</th><th>Tipo</th><th></th></tr></thead>
-          <tbody>${ms.map(rowHtml).join('')}</tbody>
-        </table></div>
         <div class="week-actions">
           <button type="button" class="printbtn clearbtn clearweek-btn" style="margin-right:0;" data-week="${ini}">🗑 Limpar semana</button>
         </div>
       </div>
     </div>`;
   }).join('') || '<p style="color:var(--ink-soft);">Sem movimentos registrados.</p>';
-
 
   const entryRows = movs.map(rowHtml).join('') || `<tr><td colspan="8">Sem movimentos registrados.</td></tr>`;
 
