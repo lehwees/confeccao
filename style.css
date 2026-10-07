@@ -944,3 +944,7 @@ label.check-row {
   margin-top: 8px;
 }
 @media print { .week-actions, .weekhist { display: none !important; } }
+.week-head { cursor: pointer; user-select: none; }
+.week-head .week-arrow { width: 14px; color: var(--ink-soft, #999); }
+.week-head .week-count { font-size: 12px; color: var(--ink-soft, #999); }
+.week-block .weekhist { margin-top: 6px; }

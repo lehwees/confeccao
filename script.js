@@ -2,6 +2,7 @@ const state = {
   movimentos: [],
   pagamentos: {},
   semanasAbertas: new Set(),
+  histAberto: new Set(),
   tipoAtual: 'saida',
   weekRef: new Date(),
   monthRef: new Date(),
@@ -529,6 +530,14 @@ function renderPersonDetail(){
       <td><span class="badge ${m.tipo}">${m.tipo==='saida'?'Saída':'Entrada'}</span></td>
       <td><button class="delbtn" data-id="${m.id}" title="Excluir">✕</button></td>
     </tr>`;
+  const prods = productTotals(movs);
+  const prodRows = prods.map(p=>`<tr>
+      <td>${escapeHtml(p.label)}</td>
+      <td>${p.levou}</td>
+      <td>${p.trouxe}</td>
+      <td>${formatSaldo(p.levou-p.trouxe)}</td>
+      <td>${formatMoney(p.valorPagar)}</td>
+    </tr>`).join('') || `<tr><td colspan="5">Sem produtos registrados.</td></tr>`;
   const mesKey = `${state.monthRef.getFullYear()}-${String(state.monthRef.getMonth()+1).padStart(2,'0')}`;
   const semanas = {};
   movs.forEach(m=>{
@@ -539,37 +548,29 @@ function renderPersonDetail(){
   const weekBlocks = Object.keys(semanas).sort().reverse().map(ini=>{
     const ms = semanas[ini];
     const {start,end} = getWeekRange(parseISO(ini));
-    const ws = productTotals(ms);
-    const total = ws.reduce((a,p)=>a+p.valorPagar,0);
+    const total = productTotals(ms).reduce((a,p)=>a+p.valorPagar,0);
     const pago = !!state.pagamentos[payKey(ini)];
-    const rows = ws.map(p=>`<tr>
-      <td>${escapeHtml(p.label)}</td><td>${p.levou}</td><td>${p.trouxe}</td>
-      <td>${formatSaldo(p.levou-p.trouxe)}</td><td>${formatMoney(p.valorPagar)}</td></tr>`).join('');
     const aberta = state.semanasAbertas.has(payKey(ini));
     return `<div class="week-block${pago?' paid':''}">
-      <div class="week-head">
+      <div class="week-head" data-week="${ini}">
+        <span class="week-arrow">${aberta?'▾':'▸'}</span>
         <b>Semana ${formatBR(start)} – ${formatBR(end)}</b>
+        <span class="week-count">${ms.length} lançamento${ms.length===1?'':'s'}</span>
         <span class="week-total">${formatMoney(total)}</span>
         <button type="button" class="paybtn${pago?' paid':''}" data-week="${ini}">${pago?'✓ Pago':'Pago?'}</button>
       </div>
-      <div style="overflow-x:auto;"><table class="entries">
-        <thead><tr><th>Produto</th><th>Qtd. saída</th><th>Qtd. entrada</th><th>Saldo</th><th>Valor a pagar</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table></div>
-      <div class="week-actions">
-        <button type="button" class="section-toggle weekhist-btn" data-week="${ini}">${aberta?'Ocultar histórico da semana ▴':'Ver histórico da semana ▾'}</button>
-        <button type="button" class="printbtn clearbtn clearweek-btn" style="margin-right:0;" data-week="${ini}">🗑 Limpar semana</button>
-      </div>
-      <div class="weekhist" style="display:${aberta?'block':'none'};overflow-x:auto;margin-top:8px;">
-        <table class="entries">
+      <div class="weekhist" style="display:${aberta?'block':'none'};">
+        <div style="overflow-x:auto;"><table class="entries">
           <thead><tr><th>Data</th><th>Pedido</th><th>Tam.</th><th>Cor</th><th>Qtd</th><th>Valor</th><th>Tipo</th><th></th></tr></thead>
           <tbody>${ms.map(rowHtml).join('')}</tbody>
-        </table>
+        </table></div>
+        <div class="week-actions">
+          <button type="button" class="printbtn clearbtn clearweek-btn" style="margin-right:0;" data-week="${ini}">🗑 Limpar semana</button>
+        </div>
       </div>
     </div>`;
-  }).join('') || '<p style="color:var(--ink-soft);">Sem produtos registrados.</p>';
+  }).join('') || '<p style="color:var(--ink-soft);">Sem movimentos registrados.</p>';
 
-  let entryRows = movs.map(rowHtml).join('') || `<tr><td colspan="8">Sem movimentos registrados.</td></tr>`;
 
   el.innerHTML = `<div class="person-panel">
     <button type="button" class="movelink" id="moveGrupoBtn">${grupoDe(name)==='financas' ? '↔ Mover para Costureiros' : '↔ Mover para Finanças'}</button>
@@ -580,19 +581,19 @@ function renderPersonDetail(){
       <div class="stat">Saldo pendente<b style="color:${pend>0?'var(--thread)':'var(--ok)'}">${pend}</b></div>
       <div class="stat">Valor a pagar<b>${formatMoney(valorPagar)}</b></div>
     </div>`}
-    ${fin ? finTable : weekBlocks}
+    ${fin ? finTable : `<div style="overflow-x:auto;"><table class="entries">
+      <thead><tr><th>Produto</th><th>Qtd. saída</th><th>Qtd. entrada</th><th>Saldo</th><th>Valor a pagar</th></tr></thead>
+      <tbody>${prodRows}</tbody>
+    </table></div>`}
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px;">
-    <button type="button" class="section-toggle" id="toggleHistBtn">Ver histórico detalhado ▾</button>
+    <button type="button" class="section-toggle" id="toggleHistBtn">${state.histAberto.has(name)?'Ocultar histórico detalhado ▴':'Ver histórico detalhado ▾'}</button>
       <div style="display:flex;gap:8px;">
         <button type="button" class="printbtn clearbtn" style="margin-right:0;" id="clearPersonBtn">🗑 Limpar tudo</button>
         <button class="printbtn" id="printPersonBtn">🖨 Imprimir ficha de ${escapeHtml(name)}</button>
       </div>
     </div>
-    <div id="histWrap" style="display:none;overflow-x:auto;margin-top:8px;">
-      ${fin ? finHist : `<table class="entries">
-        <thead><tr><th>Data</th><th>Pedido</th><th>Tam.</th><th>Cor</th><th>Qtd</th><th>Valor</th><th>Tipo</th><th></th></tr></thead>
-        <tbody>${entryRows}</tbody>
-      </table>`}
+    <div id="histWrap" style="display:${state.histAberto.has(name)?'block':'none'};overflow-x:auto;margin-top:8px;">
+      ${fin ? finHist : weekBlocks}
     </div>
   </div>`;
 
@@ -600,6 +601,7 @@ function renderPersonDetail(){
     const histWrap = document.getElementById('histWrap');
     const open = histWrap.style.display !== 'none';
     histWrap.style.display = open ? 'none' : 'block';
+    if(open) state.histAberto.delete(name); else state.histAberto.add(name);
     e.target.textContent = open ? 'Ver histórico detalhado ▾' : 'Ocultar histórico detalhado ▴';
   });
 
@@ -616,13 +618,14 @@ function renderPersonDetail(){
     });
   });
 
-  el.querySelectorAll('.weekhist-btn').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const k = payKey(btn.dataset.week);
-      const box = btn.closest('.week-block').querySelector('.weekhist');
+  el.querySelectorAll('.week-head').forEach(head=>{
+    head.addEventListener('click', (e)=>{
+      if(e.target.closest('.paybtn')) return;
+      const k = payKey(head.dataset.week);
+      const box = head.parentElement.querySelector('.weekhist');
       const abrir = box.style.display === 'none';
       box.style.display = abrir ? 'block' : 'none';
-      btn.textContent = abrir ? 'Ocultar histórico da semana ▴' : 'Ver histórico da semana ▾';
+      head.querySelector('.week-arrow').textContent = abrir ? '▾' : '▸';
       if(abrir) state.semanasAbertas.add(k); else state.semanasAbertas.delete(k);
     });
   });
